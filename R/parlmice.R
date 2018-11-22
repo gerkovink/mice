@@ -112,11 +112,17 @@ parlmice <- function(data, m = 5, seed = NA, cluster.seed = NA, n.core = NULL,
 
   # make computing cluster
   cl <- parallel::makeCluster(n.core, type = cl.type)
+  # add necessary objects
   parallel::clusterExport(cl, 
                           varlist = c("data", "m", "seed", "cluster.seed", 
-                                      "n.core", "n.imp.core", "cl.type",
-                                      ls(parent.frame())), 
+                                      "n.core", "n.imp.core", "cl.type"), 
                           envir = environment())
+  # add necessary objects if nested frames and not in current frame
+  
+  parallel::clusterExport(cl, 
+                          varlist = ls(parent.frame()), 
+                          envir = parent.frame())
+  # add do.call()
   parallel::clusterExport(cl, 
                           varlist = "do.call")
   parallel::clusterEvalQ(cl, library(mice))
