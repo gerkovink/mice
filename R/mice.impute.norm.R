@@ -160,7 +160,7 @@ estimice <- function(x, y, ls.meth = "qr", ridge = 1e-05, ...){
 }
 
 search.parents <- function(name, start = 4){
-  while(inherits(try(get("printFlag", parent.frame(start)), silent = TRUE), 
+  while(inherits(try(get(name, parent.frame(start)), silent = TRUE), 
                  "try-error")){
     start = start + 1
   }
