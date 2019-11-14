@@ -73,7 +73,9 @@
 #'cmp <- complete(imp)
 #'points(cmp$x[is.na(dat$x)], cmp$xx[is.na(dat$x)], col = mdc(2))
 #'@export
-mice.impute.quadratic <-function (y, ry, x, wy = NULL, ...) {
+mice.impute.quadratic <-function (y, ry, x, wy = NULL, quad.outcome = NULL, ...) {
+  if (is.null(quad.outcome)) stop("Argument 'quad.outcome' for mice.impute.quadratic has not been specified")
+  if (!quad.outcome %in% colnames(x)) stop("The name specified for the outcome in 'quad.outcome' can not be found in the data")
   if (is.null(wy)) wy <- !ry
 	x <- cbind(1, as.matrix(x))
 	
@@ -81,7 +83,7 @@ mice.impute.quadratic <-function (y, ry, x, wy = NULL, ...) {
 	y2 <- y^2
 	
 	#create z based on B1 * y + B2 * y^2
- 	parm  <- .norm.draw(x[,2], ry, cbind(1, y, y2))	
+ 	parm  <- .norm.draw(x[, quad.outcome], ry, cbind(1, y, y2))	
 	zobs <- cbind(y, y2) %*% parm$coef[-1]  
 	
 	#impute z
@@ -100,12 +102,12 @@ mice.impute.quadratic <-function (y, ry, x, wy = NULL, ...) {
 	#calculate the abscissa at the parabolic minimum/maximum
 	y.min <- -b1 / (2 * b2)
 	
-	#calculate regression parameters for 
-	q <- x[, 2]
+	#calculate regression parameters for
+	q <- x[, quad.outcome]
 	vobs  <- glm(y > y.min ~ q + zstar + q * zstar, subset = ry, family = binomial)
 	
 	#impute Vmis
-	newdata <- data.frame(q = x[wy, 2], zstar = zstar[wy])
+	newdata <- data.frame(q = x[wy, quad.outcome], zstar = zstar[wy])
 	prob    <- predict(vobs, newdata = newdata, type = "response", 
 	                   na.action = na.exclude)
 	idy 	<- rbinom(sum(wy), 1, prob = prob)
