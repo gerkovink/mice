@@ -1,10 +1,10 @@
-#' Wrapper function that runs MICE in parallel
+#' Wrapper function that runs MICE in futures
 #'
 #' This is a wrapper function for \code{\link{mice}}, using multiple cores to
 #' execute \code{\link{mice}} in parallel. As a result, the imputation
 #' procedure can be sped up, which may be useful in general.
 #'
-#' This function relies on package \code{\link{parallel}}, which is a base
+#' This function relies on package \code{\link{furrr}}, which is a base
 #' package for R versions 2.14.0 and later. We have chosen to use parallel function
 #' \code{parLapply} to allow the use of \code{parlmice} on Mac, Linux and Windows
 #' systems. For the same reason, we use the Parallel Socket Cluster (PSOCK) type by default.
@@ -67,70 +67,83 @@
 #' }
 #'
 #' @export
-parlmice <- function(data, m = 5, seed = NA, cluster.seed = NA, n.core = NULL,
-                     n.imp.core = NULL, cl.type = "PSOCK", ...) {
+futuremice <- function(data, m = 5, seed = NA, parallelseed = NA, n.core = NULL,
+                       n.imp.core = NULL, use.logical = TRUE, ...) {
+  
+  # check if pacakages available
+  mice:::install.on.demand("parallelly", ...)
+  mice:::install.on.demand("furrr", ...)
+  mice:::install.on.demand("future", ...)
+  
   # check form of data and m
   data <- check.dataform(data)
   m <- check.m(m)
-  
+
   # check if data complete
   if (sum(is.na(data)) == 0) {
     stop("Data has no missing values")
   }
   
+  # number of available cores
+  available <- parallelly::availableCores(logical = use.logical)
+  
   # check if arguments match CPU specifications
   if (!is.null(n.core)) {
-    if (n.core > parallel::detectCores()) {
+    if (n.core > available) {
       stop("Number of cores specified is greater than the number of logical cores in your CPU")
     }
   }
-  
+
   # determine course of action when not all arguments specified
   if (!is.null(n.core) & is.null(n.imp.core)) {
     n.imp.core <- m
     warning(paste("Number of imputations per core not specified: n.imp.core = m =", m, "has been used"))
   }
   if (is.null(n.core) & !is.null(n.imp.core)) {
-    n.core <- parallel::detectCores() - 1
-    warning(paste("Number of cores not specified. Based on your machine a value of n.core =", parallel::detectCores() - 1, "is chosen"))
+    n.core <- available - 1 # leave one out by default for other processes. users can override if wanted
+    warning(paste("Number of cores not specified. Based on your machine a value of n.core =", parallelly::availableCores(logical = TRUE) - 1, "is chosen"))
   }
   if (is.null(n.core) & is.null(n.imp.core)) {
-    specs <- match.cluster(n.core = parallel::detectCores() - 1, m = m)
+    specs <- match.cluster(n.core = (available - 1), m = m)
     n.core <- specs$cores
     n.imp.core <- specs$imps
   }
   if (!is.na(seed)) {
     if (n.core > 1) {
-      warning("Be careful; the specified seed is equal for all imputations. Please consider specifying cluster.seed instead.")
+      warning("Be careful; the specified seed is equal for all imputations. Please consider specifying parallelseed instead.")
     }
   }
-  
-  # create arguments to export to cluster
-  args <- match.call(mice, expand.dots = TRUE)
-  args[[1]] <- NULL
-  args$m <- n.imp.core
-  
-  # make computing cluster
-  cl <- parallel::makeCluster(n.core, type = cl.type)
-  parallel::clusterExport(cl,
-                          varlist = c(
-                            "data", "m", "seed", "cluster.seed",
-                            "n.core", "n.imp.core", "cl.type",
-                            ls(parent.frame())
-                          ),
-                          envir = environment()
-  )
-  parallel::clusterExport(cl,
-                          varlist = "do.call"
-  )
-  parallel::clusterEvalQ(cl, library(mice))
-  if (!is.na(cluster.seed)) {
-    parallel::clusterSetRNGStream(cl, cluster.seed)
+  if (is.na(parallelseed)) {
+    ### Two options here:
+    ### option 1 is to specify the seed as the current random seed
+    # current_seed <- .Random.seed # commented out because I prefer option 2
+    ### and then make the output seed of mice a list, with first the current, regular
+    ### {seed} argument, and second the current state of the random number generator
+    ### as specified above
+    
+    ### option 2 is to randomly sample a random seed, and return this seed
+    parallelseed <- round(runif(1, -999999999, 999999999))
   }
   
-  # generate imputations
-  imps <- parallel::parLapply(cl = cl, X = 1:n.core, function(x) do.call(mice, as.list(args), envir = environment()))
-  parallel::stopCluster(cl)
+  ### set seed, either user-specified or randomly drawn
+  withr::local_seed(parallelseed)
+  
+  # start multisession
+  future::plan(future::multisession, 
+               workers = n.core) 
+  
+  # begin future
+  imps <- furrr::future_map(1:n.core, function(x) {
+    mice(data = data, 
+         m = n.imp.core, 
+         print = F, 
+         ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
+  
+  # end multisession
+  future::plan(future::sequential)
+  
+  # stitch future into mids
   
   # postprocess clustered imputation into a mids object
   imp <- imps[[1]]
@@ -144,7 +157,9 @@ parlmice <- function(data, m = 5, seed = NA, cluster.seed = NA, n.core = NULL,
     colnames(imp$imp[[i]]) <- 1:imp$m
   }
   
-  imp
+  imp$parallelseed <- parallelseed
+
+  return(imp)
 }
 
 match.cluster <- function(n.core, m) {
