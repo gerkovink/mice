@@ -89,7 +89,7 @@ sampler <- function(data, m, ignore, where, imp, blocks, method,
               cmd <- post[j]
               if (cmd != "") {
                 eval(parse(text = cmd))
-                data[(!r[, j]) & where[, j], j] <- imp[[j]][, i]
+                data[where[, j], j] <- imp[[j]][, i]
               }
             }
           }
