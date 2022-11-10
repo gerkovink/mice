@@ -81,6 +81,7 @@ futuremice <- function(data, m = 5, parallelseed = NA, n.core = NULL, seed = NA,
   install.on.demand("parallelly", ...)
   install.on.demand("furrr", ...)
   install.on.demand("future", ...)
+  install.on.demand("progressr", ...)
 
   # check form of data and m
   data <- check.dataform(data)
@@ -148,10 +149,11 @@ futuremice <- function(data, m = 5, parallelseed = NA, n.core = NULL, seed = NA,
   # start multisession
   future::plan(future.plan,
                workers = n.core)
-
+  p <- progressr::progressor(steps = length(n.imp.core))
+  
   # begin future
   imps <- furrr::future_map(n.imp.core, function(x) {
-
+    p()
     mice(data = data,
          m = x,
          printFlag = FALSE,
