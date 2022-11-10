@@ -149,6 +149,7 @@ futuremice <- function(data, m = 5, parallelseed = NA, n.core = NULL, seed = NA,
   # start multisession
   future::plan(future.plan,
                workers = n.core)
+  # allow for progressbar
   p <- progressr::progressor(steps = length(n.imp.core))
   
   # begin future
