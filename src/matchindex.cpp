@@ -85,7 +85,7 @@ using namespace Rcpp;
 //' @author Stef van Buuren, Nasinski Maciej, Alexander Robitzsch
 //' @export
 // [[Rcpp::export]]
-IntegerVector matchindex(NumericVector d, NumericVector t, int k = 5) {
+IntegerVector matchindex(NumericVector d, NumericVector t, int k = 5, NumericVector c) {
 
   Environment base("package:base");
   Function sample = base["sample"];
