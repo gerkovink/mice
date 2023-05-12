@@ -1,6 +1,6 @@
 #' Imputation by predictive mean matching
 #'
-#' @aliases mice.impute.pmm pmm
+#' @aliases mice.impute.pmm.conditional pmm.conditional
 #' @param y Vector to be imputed
 #' @param ry Logical vector of length \code{length(y)} indicating the
 #' the subset \code{y[ry]} of elements in \code{y} to which the imputation
