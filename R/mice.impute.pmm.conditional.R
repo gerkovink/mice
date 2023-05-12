@@ -8,8 +8,8 @@
 #' (\code{TRUE}) and missing values (\code{FALSE}) in \code{y}.
 #' @param x Numeric design matrix with \code{length(y)} rows with predictors for
 #' \code{y}. Matrix \code{x} may have no missing values.
-#' @param whichcolumn Which column to use for conditional imputation of the 
-#' incomplete values (i.e. limit the set of donors to values other than whichcolumn)
+#' @param whichcolumn Vector with for each variable a character string indicating
+#' which variable should be used for excluding other variables.
 #' @param exclude Value or vector of values to exclude from the imputation donor pool in \code{y}
 #' @param wy Logical vector of length \code{length(y)}. A \code{TRUE} value
 #' indicates locations in \code{y} for which imputations are created.
@@ -17,6 +17,7 @@
 #' The default is \code{donors = 5L}. Setting \code{donors = 1L} always selects
 #' the closest match, but is not recommended. Values between 3L and 10L
 #' provide the best results in most cases (Morris et al, 2015).
+#' @param j The name of the variable that is currently imputed.
 #' @param matchtype Type of matching distance. The default choice
 #' (\code{matchtype = 1L}) calculates the distance between
 #' the \emph{predicted} value of \code{yobs} and
@@ -119,9 +120,10 @@
 #' blots$hgt$exclude %in% unlist(c(imp$imp$hgt)) # MUST be all FALSE
 #' blots$tv$exclude %in% unlist(c(imp$imp$tv)) # MUST be all FALSE
 #' @export
-mice.impute.pmm <- function(y, ry, x, whichcolumn, wy = NULL, donors = 5L,
-                            matchtype = 1L, exclude = -99999999, ridge = 1e-05,
-                            use.matcher = FALSE, ...) {
+mice.impute.pmm.conditional <- function(y, ry, x, whichcolumn, wy = NULL, donors = 5L, j,
+                                        matchtype = 1L, exclude = -99999999, ridge = 1e-05,
+                                        use.matcher = FALSE, ...) {
+
   id.ex <- !ry | !y %in% exclude # id vector for exclusion
   y <- y[id.ex] # leave out the exclude vector y's
   # allow for one-dimensional x-space
@@ -157,8 +159,13 @@ mice.impute.pmm <- function(y, ry, x, whichcolumn, wy = NULL, donors = 5L,
     yhatobs <- x[ry, , drop = FALSE] %*% parm$beta
     yhatmis <- x[wy, , drop = FALSE] %*% parm$beta
   }
-  cond <- x[wy, whichcolumn] # vector of conditionals to exclude from serving as donors
-  idx <- matchindex(yhatobs, yhatmis, donors, cond)
+  # TODO: How to specify cond. 
+  
+  if (whichcolumn[j] == "") {
+    stop("You cannot use 'mice.impute.pmm.conditional' if you don't want to exclude any values, use 'mice.impute.pmm' instead.")
+  }
+  cond <- x[wy, whichcolumn[j]] # vector of conditionals to exclude from serving as donors
+  idx <- matchindex_dev(yhatobs, yhatmis, donors, cond, y[ry])
   return(y[ry][idx])
 }
 
