@@ -1,17 +1,20 @@
-#include <Rcpp.h>
-#include <algorithm>
-#include <vector>
-using namespace std;
+#include <RcppArmadillo.h>
 using namespace Rcpp;
+using namespace arma;
+using namespace std;
 
 //' Find index of matched donor units
 //'
-//' @param d   Numeric vector with values from donor cases.
-//' @param t   Numeric vector with values from target cases.
+//' @param yhatobs   Numeric vector with values from donor cases.
+//' @param yhatmis   Numeric vector with values from target cases.
 //' @param k   Integer, number of unique donors from which a random draw is made.
 //' For \code{k = 1} the function returns the index in \code{d} corresponding
 //' to the closest unit. For multiple imputation, the
 //' advice is to set values in the range of \code{k = 5} to \code{k = 10}.
+//' @param cond    Vector with values of the same length as yhatmis, with a
+//' value to exclude from the donor pool for each missing observation.
+//' @param ytrue   The observed y-values from which the donors are drawn, to
+//' discard the observations from this set.
 //' @return An integer vector with \code{length(t)} elements. Each
 //' element is an index in the array \code{d}.
 //' @details
@@ -29,7 +32,7 @@ using namespace Rcpp;
 //'
 //' 4. Pre-sample vector \code{h} with values between 1 and \code{k}
 //'
-//' For each of the \code{n0} elements in \code{t}:
+//' For each of the \code{nmis} elements in \code{t}:
 //'
 //'   5. find the two adjacent neighbours
 //'
@@ -37,7 +40,7 @@ using namespace Rcpp;
 //'
 //'   7. store the index of that neighbour
 //'
-//' Return vector of \code{n0} positions in \code{d}.
+//' Return vector of \code{nmis} positions in \code{d}.
 //'
 //' We may use the function to perform predictive mean matching under a given
 //' predictive model. To do so, specify both \code{d} and \code{t} as
@@ -83,94 +86,66 @@ using namespace Rcpp;
 //' # (which we know here) is located within the inter-quartile range of each
 //' # distribution. Is your count anywhere close to 500? Why? Why not?
 //' @author Stef van Buuren, Nasinski Maciej, Alexander Robitzsch
-//' @export
-// [[Rcpp::export]]
-IntegerVector matchindex(NumericVector d, NumericVector t, int k = 5) {
 
+//' @export 
+// [[Rcpp::export]]
+arma::vec matchindex_dev(arma::vec yhatobs, arma::vec yhatmis, int k, arma::vec cond, arma::vec ytrue) {
+  
   Environment base("package:base");
   Function sample = base["sample"];
-
+  
   // declarations
-  int n1 = d.size();
-  int n0 = t.size();
-
-  // 1. Shuffle records to remove effects of ties
-  // Suggested by Alexander Robitzsch
-  // https://github.com/stefvanbuuren/mice/issues/236
-  // Call base::sample() to advance .Random.seed
-  IntegerVector ishuf= sample(n1);
+  int nobs = yhatobs.size();
+  int nmis = yhatmis.size();
+  
+  arma::uvec ishuf = as<arma::uvec>(sample(nobs));
   ishuf = ishuf - 1;
-  NumericVector yshuf(n1);
-  for (int i = 0; i < n1; i++) {yshuf(i) = d(ishuf(i));}
-
-  // 2. Obtain sorting order on shuffled data
-  // https://stackoverflow.com/questions/1577475/c-sorting-and-keeping-track-of-indexes
-  IntegerVector isort(n1);
-  iota(isort.begin(), isort.end(), 0);
-  stable_sort(isort.begin(), isort.end(),
-              [yshuf](int i1, int i2) {return yshuf[i1] < yshuf[i2];});
-
-  // 3. Calculate index on input data and sort
-  IntegerVector id(n1);
-  std::vector<double> ysort(n1);
-  for (int i = 0; i < n1; i++) {
-    id(i) = ishuf(isort(i));
-    ysort[i] = d(id(i));
-  }
-
-  // 4. Pre-sample n0 values between 1 and k
-  // restrict 1 <= k <= n1
-  k = (k <= n1) ? k : n1;
-  k = (k >= 1) ? k : 1;
-  IntegerVector kv(k);
-  iota(kv.begin(), kv.end(), 1);
-  IntegerVector h = sample(kv, n0, Rcpp::_["replace"] = true);
-
-  IntegerVector idx(n0);
-
-  // loop over the target units
-  for (int i = 0; i < n0; i++) {
-    double val = t(i);
+  arma::vec yshuf = yhatobs(ishuf);
+  arma::uvec id = arma::sort_index(yshuf);
+  arma::vec ysort = yshuf(id);
+  
+  // 4. Pre-sample nmis values between 1 and k
+  // restrict 1 <= k <= nobs
+  k = arma::min(arma::vec({max(arma::vec({1, k})), nobs}));
+  arma::uvec h = as<arma::uvec>(sample(k, nmis, Rcpp::_["replace"] = true));
+  
+  arma::vec idx = arma::zeros<arma::vec>(nmis);
+  
+  for (int i = 0; i < nmis; i++) {
+    double val = yhatmis(i);
+    int ex = cond(i);
+    arma::vec yuse = ysort(arma::find(ytrue(id) != ex));
+    arma::uvec iduse = id(arma::find(ytrue(id) != ex));
+    int nuse = yuse.size();
     int hi = h(i);
     int count = 0;
-
+    
     // 5. find the two adjacent neighbours
-    std::vector<double>::iterator iter;
-    iter = std::lower_bound(ysort.begin(), ysort.end(), val);
-    int r = iter - ysort.begin();
+    arma::vec::iterator iter = std::lower_bound(yuse.begin(), yuse.end(), val);
+    int r = iter - yuse.begin();
     int l = r - 1;
-
-    // 6. find the h_i'th nearest neighbour
-    // 7. store the index of that neighbour
-
-    // Compare elements on left and right of crossover
-    // point to find the h'th closest match
-    // Inspired on Polkas: https://github.com/Polkas/miceFast/issues/10
-    while (count < hi && l >= 0 && r < n1)
-    {
-      if (val - ysort[l] < ysort[r] - val)
-      {
-        idx(i) = id[l--];
+    
+    while (count < hi && l >= 0 && r < nuse) {
+      if (val - yuse(l) < yuse(r) - val) {
+        idx(i) = iduse(l--);
       } else {
-        idx(i) = id[r++];
+        idx(i) = iduse(r++);
       }
       count++;
     }
-
+    
     // If right side is exhausted, take left elements
-    while (count < hi && l >= 0)
-    {
-      idx(i) = id[l--];
+    while (count < hi && l >= 0) {
+      idx(i) = iduse(l--);
       count++;
     }
-
+    
     // If left side is exhausted, take right elements
-    while (count < hi && r < n1)
-    {
-      idx(i) = id[r++];
+    while (count < hi && r < nuse) {
+      idx(i) = iduse(r++);
       count++;
     }
   }
-
   return idx + 1;
 }
+ 

@@ -90,5 +90,8 @@
 #' Van Buuren, S. (2018).
 #' \href{https://stefvanbuuren.name/fimd/}{\emph{Flexible Imputation of Missing Data. Second Edition.}}
 #' Chapman & Hall/CRC. Boca Raton, FL.
+## usethis namespace: start
 #' @useDynLib mice, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
+## usethis namespace: end
 NULL
