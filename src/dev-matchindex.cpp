@@ -106,7 +106,9 @@ arma::vec matchindex_dev(arma::vec yhatobs, arma::vec yhatmis, int k, arma::vec 
   
   // 4. Pre-sample nmis values between 1 and k
   // restrict 1 <= k <= nobs
-  k = arma::min(arma::vec({max(arma::vec({1, k})), nobs}));
+  if (k < 1) {k = 1;}
+  if (k > nobs) {k = nobs;}
+  // k = arma::min(arma::uvec({max(arma::uvec({1, k})), nobs}));
   arma::uvec h = as<arma::uvec>(sample(k, nmis, Rcpp::_["replace"] = true));
   
   arma::vec idx = arma::zeros<arma::vec>(nmis);
