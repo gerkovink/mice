@@ -128,9 +128,9 @@ mice.impute.pmm.conditional <- function(y, ry, x, whichcolumn, wy = NULL, donors
   y <- y[id.ex] # leave out the exclude vector y's
   # allow for one-dimensional x-space
   if(!is.null(dim(x))){
-    x <- x[id.ex, ]
+    x <- x[id.ex, , drop = FALSE]
   } else {
-    x <- x[id.ex]
+    x <- x[id.ex, , drop = FALSE]
   }
   # leave out the exclude vector x's
   ry <- ry[id.ex] # leave out the exclude vector indicator
