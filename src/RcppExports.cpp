@@ -26,6 +26,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// matchindex_arma
+arma::vec matchindex_arma(arma::vec yhatobs, arma::vec yhatmis, int k);
+RcppExport SEXP _mice_matchindex_arma(SEXP yhatobsSEXP, SEXP yhatmisSEXP, SEXP kSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type yhatobs(yhatobsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type yhatmis(yhatmisSEXP);
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    rcpp_result_gen = Rcpp::wrap(matchindex_arma(yhatobs, yhatmis, k));
+    return rcpp_result_gen;
+END_RCPP
+}
 // legendre
 Rcpp::NumericMatrix legendre(Rcpp::NumericVector x, int p);
 RcppExport SEXP _mice_legendre(SEXP xSEXP, SEXP pSEXP) {
@@ -67,6 +80,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mice_matchindex_dev", (DL_FUNC) &_mice_matchindex_dev, 5},
+    {"_mice_matchindex_arma", (DL_FUNC) &_mice_matchindex_arma, 3},
     {"_mice_legendre", (DL_FUNC) &_mice_legendre, 2},
     {"_mice_matcher", (DL_FUNC) &_mice_matcher, 3},
     {"_mice_matchindex", (DL_FUNC) &_mice_matchindex, 3},
