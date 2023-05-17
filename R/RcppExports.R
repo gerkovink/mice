@@ -91,6 +91,13 @@ matchindex_dev <- function(yhatobs, yhatmis, k, cond, ytrue) {
     .Call(`_mice_matchindex_dev`, yhatobs, yhatmis, k, cond, ytrue)
 }
 
+#' Find index of matched donor units
+NULL
+
+matchindex_arma <- function(yhatobs, yhatmis, k) {
+    .Call(`_mice_matchindex_arma`, yhatobs, yhatmis, k)
+}
+
 legendre <- function(x, p) {
     .Call(`_mice_legendre`, x, p)
 }

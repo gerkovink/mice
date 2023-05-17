@@ -101,8 +101,8 @@ arma::vec matchindex_dev(arma::vec yhatobs, arma::vec yhatmis, int k, arma::vec 
   arma::uvec ishuf = as<arma::uvec>(sample(nobs));
   ishuf = ishuf - 1;
   arma::vec yshuf = yhatobs(ishuf);
-  arma::uvec id = arma::sort_index(yshuf);
-  arma::vec ysort = yshuf(id);
+  arma::uvec id = ishuf(arma::stable_sort_index(yshuf));
+  arma::vec ysort = yhatobs(id);
   
   // 4. Pre-sample nmis values between 1 and k
   // restrict 1 <= k <= nobs
