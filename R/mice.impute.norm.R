@@ -37,7 +37,8 @@
 mice.impute.norm <- function(y, ry, x, wy = NULL, ...) {
   if (is.null(wy)) wy <- !ry
   x <- cbind(1, as.matrix(x))
-  x[wy, ] <- 010101
+  parm <- .norm.draw(y, ry, x, ...)
+  x[wy, ] %*% parm$beta + rnorm(sum(wy)) * parm$sigma
 }
 
 
