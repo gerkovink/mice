@@ -7,6 +7,14 @@ sampler <- function(data, m, ignore, where, imp, blocks, method,
   to <- fromto[2]
   maxit <- to - from + 1
   r <- !is.na(data)
+  
+  
+  ##For xgboost
+  train_error <-  list()
+  for (j in visitSequence) {
+    train_error[[j]] <- as.data.frame(matrix(NA, nrow = 1, ncol = m))
+  }
+  ##
 
   # set up array for convergence checking
   chainMean <- chainVar <- initialize.chain(names(data), maxit, m)
@@ -71,7 +79,7 @@ sampler <- function(data, m, ignore, where, imp, blocks, method,
           # (repeated) univariate imputation - pred method
           if (univ) {
             for (j in b) {
-              imp[[j]][, i] <-
+              tmp_imp <-
                 sampler.univ(
                   data = data, r = r, where = where,
                   pred = pred, formula = ff,
@@ -81,7 +89,14 @@ sampler <- function(data, m, ignore, where, imp, blocks, method,
                   user = user, ignore = ignore,
                   ...
                 )
-
+              #for xgboost
+              if(theMethod=="xgb"){
+                imp[[j]][, i] <- tmp_imp$imputes
+                train_error[[j]][1,i] <-tmp_imp$err 
+              } else {
+                imp[[j]][, i] <- tmp_imp
+              }
+##
               data[(!r[, j]) & where[, j], j] <-
                 imp[[j]][(!r[, j])[where[, j]], i]
 
@@ -175,7 +190,7 @@ sampler <- function(data, m, ignore, where, imp, blocks, method,
       }
     }
   }
-  list(iteration = maxit, imp = imp, chainMean = chainMean, chainVar = chainVar)
+  list(iteration = maxit, imp = imp, chainMean = chainMean, chainVar = chainVar,trainError=train_error) #trainError is added for xgboost
 }
 
 
@@ -245,6 +260,14 @@ sampler.univ <- function(data, r, where, pred, formula, method, yname, k,
   imputes[!cc] <- NA
 
   args <- c(list(y = y, ry = ry, x = x, wy = wy, type = type), user, list(...))
-  imputes[cc] <- do.call(f, args = args)
-  imputes
+  imputes_combined <- do.call(f, args = args)
+  
+  if(method=="xgb"){
+    imputes[cc] <- imputes_combined[[1]]
+    err<-imputes_combined[[2]]
+    return(list("imputes"=imputes, "err"=err))
+  } else {
+    imputes[cc] <- imputes_combined
+    return(imputes)
+  }
 }
